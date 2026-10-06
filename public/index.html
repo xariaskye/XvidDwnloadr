@@ -8,8 +8,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="XvidDwnloadr" />
   <title>XvidDwnloadr</title>
-  <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <style>
     :root { color-scheme: dark; --bg:#09090b; --card:#141418; --line:#2a2a32; --text:#fafafa; --muted:#a1a1aa; --pink:#f472b6; --pink2:#db2777; }
     * { box-sizing: border-box; }
@@ -22,7 +22,7 @@
     input { width:100%; border:1px solid var(--line); background:#0c0c0f; color:var(--text); border-radius: 12px; padding: 14px 12px; font-size: 16px; }
     .row { display:flex; gap:8px; margin-top: 10px; }
     button, .btn { appearance:none; border:0; border-radius: 12px; padding: 13px 14px; font-weight: 650; font-size: 0.95rem; cursor: pointer; text-decoration: none; display:inline-flex; align-items:center; justify-content:center; }
-    button.primary { background: linear-gradient(180deg, var(--pink), var(--pink2)); color:#1a0510; flex:1; }
+    button.primary, .btn.primary { background: linear-gradient(180deg, var(--pink), var(--pink2)); color:#1a0510; flex:1; }
     button.ghost, .btn.ghost { background:#222228; color:var(--text); }
     button:disabled { opacity: 0.55; cursor: wait; }
     .status { min-height: 1.3em; margin: 14px 2px; color: var(--muted); }
@@ -52,7 +52,7 @@
     <section class="card" id="result" hidden>
       <video id="player" controls playsinline></video>
       <div class="actions">
-        <a class="btn primary" id="save" href="#" download>Save video</a>
+        <a class="btn primary" id="save" href="#">Save video</a>
         <a class="btn ghost" id="open" href="#" target="_blank" rel="noopener">Open file</a>
       </div>
     </section>
@@ -61,7 +61,7 @@
       <div id="recent-list"></div>
     </section>
     <footer>
-      Uses the same download flow as the x-downloader.com GitHub Action. Public video posts only. If a link fails, the post may have no video or the downloader service is busy.
+      Same download flow as the x-downloader.com GitHub Action. Public video posts only. Save the file when it appears; host links do not last forever.
     </footer>
   </main>
   <script>
@@ -73,6 +73,7 @@
     const save = document.getElementById("save");
     const open = document.getElementById("open");
     const go = document.getElementById("go");
+    const API = "https://api.x-downloader.com";
 
     const params = new URLSearchParams(location.search);
     if (params.get("url")) urlInput.value = params.get("url");
@@ -81,14 +82,12 @@
       statusEl.textContent = text;
       statusEl.className = "status" + (isError ? " error" : "");
     }
-
     function remember(url) {
       const items = JSON.parse(localStorage.getItem("xvid-recent") || "[]").filter((x) => x !== url);
       items.unshift(url);
       localStorage.setItem("xvid-recent", JSON.stringify(items.slice(0, 6)));
       renderRecent();
     }
-
     function renderRecent() {
       const items = JSON.parse(localStorage.getItem("xvid-recent") || "[]");
       const wrap = document.getElementById("recent");
@@ -104,59 +103,65 @@
         list.appendChild(b);
       });
     }
-
     document.getElementById("paste").onclick = async () => {
-      try {
-        urlInput.value = await navigator.clipboard.readText();
-      } catch {
-        setStatus("Clipboard blocked. Paste it in the box yourself.", true);
-      }
+      try { urlInput.value = await navigator.clipboard.readText(); }
+      catch { setStatus("Clipboard blocked. Paste it in the box yourself.", true); }
     };
-
+    async function startJob(url) {
+      const validate = await fetch(API + "/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url })
+      });
+      const validated = await validate.json();
+      if (validated.status === "error") throw new Error("That link was rejected as an invalid X video URL.");
+      const request = await fetch(API + "/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url })
+      });
+      const job = await request.json();
+      if (!job._id) throw new Error("No download job. The post may have no video, or the service is busy.");
+      return job._id;
+    }
     async function poll(jobId) {
       for (let i = 0; i < 30; i++) {
-        setStatus("Working on it… " + (i + 1));
-        const res = await fetch("/api/status?id=" + encodeURIComponent(jobId));
+        setStatus("Working on it\u2026 " + (i + 1));
+        const res = await fetch(API + "/download/" + jobId);
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Status check failed");
-        if (data.status === "finished" && data.download_url) return data;
+        if (data.status === "error") throw new Error("Download job failed.");
+        if (data.status === "finished" && data.host && data.filename) {
+          return { download_url: "https://" + data.host + "/" + data.filename, filename: data.filename };
+        }
         await new Promise((r) => setTimeout(r, 2000));
       }
       throw new Error("Still processing after a minute. Try the link again.");
     }
-
     form.onsubmit = async (event) => {
       event.preventDefault();
       result.hidden = true;
       player.removeAttribute("src");
       go.disabled = true;
-      setStatus("Starting download…");
+      setStatus("Starting download\u2026");
       try {
         const url = urlInput.value.trim();
-        const res = await fetch("/api/download", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Could not start download");
-        const done = await poll(data.job_id);
+        const jobId = await startJob(url);
+        const done = await poll(jobId);
         player.src = done.download_url;
         save.href = done.download_url;
-        save.download = done.filename || "video.mp4";
+        save.setAttribute("download", done.filename || "video.mp4");
         open.href = done.download_url;
         result.hidden = false;
         remember(url);
-        setStatus("Ready. Save it before the host link expires.");
+        setStatus("Ready. If Save just opens the video, use the share sheet and pick Save Video.");
       } catch (err) {
         setStatus(err.message || "Something broke.", true);
       } finally {
         go.disabled = false;
       }
     };
-
     renderRecent();
-    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
   </script>
 </body>
 </html>
