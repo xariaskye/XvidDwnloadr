@@ -1,46 +1,53 @@
 # XvidDwnloadr
 
-Paste an X (Twitter) post link and download the video. Works in the browser on your phone, tablet, or computer. No app store install.
+Save videos from public X posts. One product, one link.
 
-Built from the download flow in [TwitterXVideoDownloader/x-twitter-video-downloader-workflow](https://github.com/TwitterXVideoDownloader/x-twitter-video-downloader-workflow) (MIT). That repo is a GitHub Action, not something you can open on a phone, so this project wraps the same `api.x-downloader.com` steps in a web app.
+**Live:** https://xviddwnloadr-xariaskyes-projects.vercel.app
+
+Paste a post URL. XvidDwnloadr pulls the video, plays it, and gives you the file. Phone, tablet, or computer. The site is the product. iOS, Android, and browser extensions ship from this same repo.
 
 ## Use it
 
-1. Open the deployed site (Vercel) or run it locally.
-2. Paste a post URL such as `https://x.com/user/status/123`.
-3. Hit Download. When the job finishes, play it or save the file.
+1. Open the live link.
+2. Paste a public post, like `https://x.com/user/status/123`.
+3. Hit Download. Play it, or save the file.
 
-On iPhone: Safari → Share → Add to Home Screen. On Android: Chrome menu → Install app / Add to Home screen.
+A direct link works too: `/?url=https://x.com/user/status/123`.
 
-You can also open `/?url=https://x.com/user/status/123`.
+## Where it runs
 
-## How the download works
+| Surface | Status |
+| --- | --- |
+| Web | Live on Vercel |
+| iPhone app | Planned. App Store build from this repo |
+| Android app | Planned. Play Store build from this repo |
+| Desktop | Planned as browser extensions, not a separate app |
 
-Same three calls as the original Action:
+GitHub Pages is off on purpose. Do not publish a second URL.
 
-1. `POST https://api.x-downloader.com/validate` with `{ url }`
-2. `POST https://api.x-downloader.com/request` with `{ url }` → job id
-3. `GET https://api.x-downloader.com/download/{jobId}` until `status` is `finished`
-4. File URL is `https://{host}/{filename}`
+## Project layout
 
-The browser talks to `/api/download` and `/api/status` on this app so the third-party API is not blocked by CORS.
+- `public/` is the web app.
+- `api/` is the optional Vercel proxy.
+- `scripts/download.mjs` is the terminal version.
+- `action.yml` is the workflow form of the same download.
 
-## Run locally
+Local web preview:
 
 ```bash
 npx vercel dev
 ```
 
-Or, if you only want the CLI (Node 18+):
+Terminal download:
 
 ```bash
 node scripts/download.mjs "https://x.com/user/status/123"
 ```
 
-## Limits
+## Notes
 
-- Depends on x-downloader.com. If that service is down or rate-limits you, this tool fails too.
-- Only public posts that actually contain a video. Photos, private accounts, and deleted posts will not download.
-- For personal use. Do not scrape accounts or republish other people's videos.
+Public video posts only. Photos, private accounts, and deleted posts will not download. The downloader depends on x-downloader.com, so if that service is down, this is down.
 
-Powered by [x-downloader.com](https://x-downloader.com).
+Personal use. Do not scrape accounts or repost other people's videos.
+
+Download flow adapted from [TwitterXVideoDownloader/x-twitter-video-downloader-workflow](https://github.com/TwitterXVideoDownloader/x-twitter-video-downloader-workflow), MIT.
