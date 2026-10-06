@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#09090b" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="XvidDwnloadr" />
+  <title>XvidDwnloadr</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+  <style>
+    :root { color-scheme: dark; --bg:#09090b; --card:#141418; --line:#2a2a32; --text:#fafafa; --muted:#a1a1aa; --pink:#f472b6; --pink2:#db2777; }
+    * { box-sizing: border-box; }
+    body { margin:0; min-height:100dvh; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; background: radial-gradient(1200px 500px at 50% -10%, #3b1028, transparent 55%), var(--bg); color: var(--text); }
+    main { max-width: 560px; margin: 0 auto; padding: 28px 18px 48px; }
+    h1 { font-size: 1.8rem; letter-spacing: -0.04em; margin: 0 0 6px; }
+    .sub { color: var(--muted); margin: 0 0 22px; line-height: 1.45; }
+    form, .card { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 14px; }
+    label { display:block; font-size: 0.8rem; color: var(--muted); margin-bottom: 8px; }
+    input { width:100%; border:1px solid var(--line); background:#0c0c0f; color:var(--text); border-radius: 12px; padding: 14px 12px; font-size: 16px; }
+    .row { display:flex; gap:8px; margin-top: 10px; }
+    button, .btn { appearance:none; border:0; border-radius: 12px; padding: 13px 14px; font-weight: 650; font-size: 0.95rem; cursor: pointer; text-decoration: none; display:inline-flex; align-items:center; justify-content:center; }
+    button.primary { background: linear-gradient(180deg, var(--pink), var(--pink2)); color:#1a0510; flex:1; }
+    button.ghost, .btn.ghost { background:#222228; color:var(--text); }
+    button:disabled { opacity: 0.55; cursor: wait; }
+    .status { min-height: 1.3em; margin: 14px 2px; color: var(--muted); }
+    .status.error { color: #fda4af; }
+    video { width:100%; border-radius: 14px; background:#000; margin-top: 8px; }
+    .actions { display:flex; gap:8px; margin-top: 10px; }
+    .actions .btn { flex:1; }
+    .recent { margin-top: 22px; }
+    .recent button { width:100%; text-align:left; background:transparent; color:var(--muted); border:1px solid var(--line); margin-top:8px; font-weight: 500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    footer { margin-top: 28px; color: var(--muted); font-size: 0.78rem; line-height: 1.45; }
+    a { color: var(--pink); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>XvidDwnloadr</h1>
+    <p class="sub">Paste an X or Twitter post link. I'll grab the video so you can save it on this phone or computer.</p>
+    <form id="form">
+      <label for="url">Post link</label>
+      <input id="url" name="url" inputmode="url" autocomplete="off" placeholder="https://x.com/user/status/123" required />
+      <div class="row">
+        <button class="ghost" type="button" id="paste">Paste</button>
+        <button class="primary" type="submit" id="go">Download</button>
+      </div>
+    </form>
+    <p class="status" id="status"></p>
+    <section class="card" id="result" hidden>
+      <video id="player" controls playsinline></video>
+      <div class="actions">
+        <a class="btn primary" id="save" href="#" download>Save video</a>
+        <a class="btn ghost" id="open" href="#" target="_blank" rel="noopener">Open file</a>
+      </div>
+    </section>
+    <section class="recent" id="recent" hidden>
+      <label>Recent</label>
+      <div id="recent-list"></div>
+    </section>
+    <footer>
+      Uses the same download flow as the x-downloader.com GitHub Action. Public video posts only. If a link fails, the post may have no video or the downloader service is busy.
+    </footer>
+  </main>
+  <script>
+    const form = document.getElementById("form");
+    const urlInput = document.getElementById("url");
+    const statusEl = document.getElementById("status");
+    const result = document.getElementById("result");
+    const player = document.getElementById("player");
+    const save = document.getElementById("save");
+    const open = document.getElementById("open");
+    const go = document.getElementById("go");
+
+    const params = new URLSearchParams(location.search);
+    if (params.get("url")) urlInput.value = params.get("url");
+
+    function setStatus(text, isError) {
+      statusEl.textContent = text;
+      statusEl.className = "status" + (isError ? " error" : "");
+    }
+
+    function remember(url) {
+      const items = JSON.parse(localStorage.getItem("xvid-recent") || "[]").filter((x) => x !== url);
+      items.unshift(url);
+      localStorage.setItem("xvid-recent", JSON.stringify(items.slice(0, 6)));
+      renderRecent();
+    }
+
+    function renderRecent() {
+      const items = JSON.parse(localStorage.getItem("xvid-recent") || "[]");
+      const wrap = document.getElementById("recent");
+      const list = document.getElementById("recent-list");
+      list.innerHTML = "";
+      if (!items.length) { wrap.hidden = true; return; }
+      wrap.hidden = false;
+      items.forEach((item) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = item;
+        b.onclick = () => { urlInput.value = item; form.requestSubmit(); };
+        list.appendChild(b);
+      });
+    }
+
+    document.getElementById("paste").onclick = async () => {
+      try {
+        urlInput.value = await navigator.clipboard.readText();
+      } catch {
+        setStatus("Clipboard blocked. Paste it in the box yourself.", true);
+      }
+    };
+
+    async function poll(jobId) {
+      for (let i = 0; i < 30; i++) {
+        setStatus("Working on it… " + (i + 1));
+        const res = await fetch("/api/status?id=" + encodeURIComponent(jobId));
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Status check failed");
+        if (data.status === "finished" && data.download_url) return data;
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+      throw new Error("Still processing after a minute. Try the link again.");
+    }
+
+    form.onsubmit = async (event) => {
+      event.preventDefault();
+      result.hidden = true;
+      player.removeAttribute("src");
+      go.disabled = true;
+      setStatus("Starting download…");
+      try {
+        const url = urlInput.value.trim();
+        const res = await fetch("/api/download", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Could not start download");
+        const done = await poll(data.job_id);
+        player.src = done.download_url;
+        save.href = done.download_url;
+        save.download = done.filename || "video.mp4";
+        open.href = done.download_url;
+        result.hidden = false;
+        remember(url);
+        setStatus("Ready. Save it before the host link expires.");
+      } catch (err) {
+        setStatus(err.message || "Something broke.", true);
+      } finally {
+        go.disabled = false;
+      }
+    };
+
+    renderRecent();
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
+  </script>
+</body>
+</html>

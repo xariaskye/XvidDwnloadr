@@ -1,0 +1,16 @@
+name: "XvidDwnloadr"
+description: "Download an X (Twitter) video in a GitHub workflow. Same flow as x-downloader.com."
+author: "Xaria Skye"
+inputs:
+  video_url:
+    description: "The X (Twitter) video post URL to download"
+    required: true
+outputs:
+  download_url:
+    description: "The URL to the downloaded X video"
+runs:
+  using: "node20"
+  main: "index.js"
+branding:
+  icon: "download"
+  color: "purple"

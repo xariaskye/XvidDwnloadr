@@ -1,0 +1,10 @@
+{
+  "name": "xviddwnloadr",
+  "version": "1.0.0",
+  "private": true,
+  "description": "XvidDwnloadr — download X/Twitter videos on any device",
+  "license": "MIT",
+  "scripts": {
+    "download": "node scripts/download.mjs"
+  }
+}
