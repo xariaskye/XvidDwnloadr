@@ -12,7 +12,11 @@ Paste a post URL. XvidDwnloadr pulls the video, plays it, and gives you the file
 2. Paste a public post, like `https://x.com/user/status/123`.
 3. Hit Download. Play it, or save the file.
 
-A direct link works too: `/?url=https://x.com/user/status/123`.
+A direct link works too. Put the post URL after `?url=`.
+
+Example: https://xviddwnloadr-xariaskyes-projects.vercel.app/?url=https://x.com/user/status/123
+
+Swap `https://x.com/user/status/123` for the real post. Opening that link fills the box for you.
 
 ## Where it runs
 
